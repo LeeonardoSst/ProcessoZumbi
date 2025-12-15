@@ -1,40 +1,35 @@
-#include <signal.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
-sig_atomic_t child_exit_status;
-
-void clean_up_child_process(int signal_number) {
+void trata_sigchld(int sig) {
     int status;
-    while (waitpid(-1, &status, WNOHANG) > 0) {
-        child_exit_status = status;
+    pid_t pid;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        printf("Filho %d terminou com status %d\n", pid, status);
     }
 }
 
 int main() {
-    struct sigaction sigchld_action;
-    memset(&sigchld_action, 0, sizeof(sigchld_action));
-    sigchld_action.sa_handler = clean_up_child_process;
-    sigaction(SIGCHLD, &sigchld_action, NULL);
+    signal(SIGCHLD, trata_sigchld);
 
-    // Criação de processos filhos
-    for (int i = 0; i < 5; i++) {
-        pid_t child_pid = fork();
-        if (child_pid == 0) {
-            // Filho
-            sleep(10 + i); // Viver por 10 segundos mais i segundos
-            exit(0);
+    for (int i = 0; i < 3; i++) {
+        if (fork() == 0) {
+            printf("Filho %d iniciado\n", getpid());
+            sleep(10 + i * 5);
+            exit(i);
         }
     }
-    
-    // Manter o pai executando
+
+    printf("Processo pai %d em execução...\n", getpid());
+
     while (1) {
-        sleep(1);
+        sleep(5);
+        printf("Pai ainda rodando...\n");
     }
-    
+
     return 0;
 }
